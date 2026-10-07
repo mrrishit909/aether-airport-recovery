@@ -1,0 +1,16 @@
+{
+ "generated": "2026-10-07T16:31:12.904Z",
+ "seed": 7,
+ "scenario": "scenario-v1",
+ "workflow": "recover-v1",
+ "note": "Everything in scenario.json is synthetic: the airport (NVK), airlines, tails, cities, passengers, ground fleet and weather feed are invented. No model is called: agents are deterministic analyzers charged simulated tokens at the configured price table; the gate solver is a real branch-and-bound search.",
+ "counts": {
+  "flights": 90,
+  "aircraft": 46,
+  "gates": 30,
+  "itineraries": 225,
+  "connectingPax": 1797,
+  "resources": 36,
+  "observations": 37
+ }
+}

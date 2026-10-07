@@ -1,0 +1,25 @@
+name: ci
+on: { push: { branches: [main] }, pull_request: {} }
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_DB: aether, POSTGRES_USER: aether, POSTGRES_PASSWORD: owner-dev-only }
+        ports: ["55540:5432"]
+        options: --health-cmd "pg_isready -U aether" --health-interval 2s --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
+      - run: bash scripts/claude/pre-bash-guard.sh --self-test && bash scripts/claude/secret-scan.sh
+      - run: npx tsc -p . && (cd apps/web && npx tsc --noEmit -p .)
+      - run: node data/simulators/generate.ts
+      - run: npx vitest run --coverage   # unit + agent contract/routing/chaos + API; fails under 85% line coverage of domain + agents + motion
+      - run: npx playwright install --with-deps chrome && npm run build -w @aether/web && npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: playwright, path: test-results }

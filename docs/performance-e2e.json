@@ -1,0 +1,24 @@
+{
+ "note": "headless Chrome with SwiftShader (software GL): FPS here is a floor, not the desktop GPU figure",
+ "fps": 7,
+ "frameP95Ms": 310.8,
+ "droppedFrames": 545,
+ "longTasks": 4,
+ "lcpMs": 84,
+ "inpMs": 816,
+ "cls": 0.001,
+ "contextLost": 0,
+ "sceneLoadMs": 1,
+ "shaderCompileMs": null,
+ "render": {
+  "calls": 20,
+  "triangles": 242802,
+  "points": 473,
+  "geometries": 21,
+  "textures": 2,
+  "programs": 9
+ },
+ "objects": 5045,
+ "recoverMsWithSimulatedLatency": 4071,
+ "jsBytesTransferred": 1563814
+}

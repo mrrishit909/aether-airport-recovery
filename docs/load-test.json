@@ -1,0 +1,49 @@
+{
+ "note": "32 HTTP clients for 10 s on the read routes, then 2,000 WebSocket subscribers held open through an analyze run, same machine (Apple silicon, Postgres in Docker). 'host' is the API run directly with node (2,000 of 2,000 open). 'docker' is one run of the API container behind Docker Desktop's port forwarding, which reset part of the handshake burst with ECONNRESET: across five runs 1,357 to 1,880 of the 2,000 opened (one earlier run on a previous build opened all 2,000). HTTP figures are similar either way.",
+ "host": {
+  "http": {
+   "requests": 4039,
+   "rps": 404,
+   "p50": 66.8,
+   "p95": 187.9,
+   "p99": 264.3,
+   "errors": 0,
+   "rateLimited": 0
+  },
+  "websocket": {
+   "requested": 2000,
+   "open": 2000,
+   "failed": 0,
+   "failedBecause": {},
+   "openedInMs": 467,
+   "analyzeStatus": 201,
+   "analyzeMs": 425,
+   "progressMessagesDelivered": 36309,
+   "perSubscriber": 18.2
+  }
+ },
+ "docker": {
+  "http": {
+   "requests": 4122,
+   "rps": 412,
+   "p50": 70.1,
+   "p95": 141.1,
+   "p99": 169.6,
+   "errors": 0,
+   "rateLimited": 0
+  },
+  "websocket": {
+   "requested": 2000,
+   "open": 1672,
+   "failed": 328,
+   "failedBecause": {
+    "connect ECONNRESET 127.0.0.1:8540": 328
+   },
+   "openedInMs": 546,
+   "analyzeStatus": 201,
+   "analyzeMs": 809,
+   "progressMessagesDelivered": 30096,
+   "perSubscriber": 18
+  }
+ }
+}

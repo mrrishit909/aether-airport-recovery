@@ -1,0 +1,143 @@
+{
+ "workflow": "recover-v1",
+ "scenario": "scenario-v1",
+ "seed": 7,
+ "totalCostUsd": 0.426228,
+ "byAgent": [
+  {
+   "agent": "weather-agent",
+   "model": "haiku",
+   "calls": 1,
+   "inputTokens": 1323,
+   "outputTokens": 276,
+   "costUsd": 0.002703
+  },
+  {
+   "agent": "flight-risk-agent",
+   "model": "sonnet",
+   "calls": 1,
+   "inputTokens": 6600,
+   "outputTokens": 436,
+   "costUsd": 0.02634
+  },
+  {
+   "agent": "gate-agent",
+   "model": "sonnet",
+   "calls": 1,
+   "inputTokens": 10080,
+   "outputTokens": 1287,
+   "costUsd": 0.049545
+  },
+  {
+   "agent": "passenger-agent",
+   "model": "sonnet",
+   "calls": 1,
+   "inputTokens": 9582,
+   "outputTokens": 865,
+   "costUsd": 0.041721
+  },
+  {
+   "agent": "ground-ops-agent",
+   "model": "sonnet",
+   "calls": 1,
+   "inputTokens": 3445,
+   "outputTokens": 499,
+   "costUsd": 0.01782
+  },
+  {
+   "agent": "passenger-agent",
+   "model": "opus",
+   "calls": 1,
+   "inputTokens": 4443,
+   "outputTokens": 411,
+   "costUsd": 0.09747
+  },
+  {
+   "agent": "optimizer-agent",
+   "model": "sonnet",
+   "calls": 1,
+   "inputTokens": 14873,
+   "outputTokens": 2119,
+   "costUsd": 0.076404
+  },
+  {
+   "agent": "recovery-synthesizer",
+   "model": "opus",
+   "calls": 1,
+   "inputTokens": 1780,
+   "outputTokens": 1167,
+   "costUsd": 0.114225
+  }
+ ],
+ "escalations": {
+  "haikuToSonnet": 0,
+  "sonnetToOpus": 1,
+  "rate": 0.143
+ },
+ "rawTokens": 12990,
+ "synthesisInputTokens": 1780,
+ "findings": 35,
+ "options": [
+  {
+   "id": "W",
+   "name": "Wait for gates (no re-assignment)",
+   "misconnected": 101,
+   "vulnerable": 17,
+   "totalDelayMin": 1298,
+   "gateChanges": 0,
+   "holds": 21,
+   "optimal": true,
+   "nodes": 0
+  },
+  {
+   "id": "A",
+   "name": "Minimum total delay",
+   "misconnected": 128,
+   "vulnerable": 17,
+   "totalDelayMin": 1088,
+   "gateChanges": 9,
+   "holds": 9,
+   "optimal": false,
+   "nodes": 8001
+  },
+  {
+   "id": "B",
+   "name": "Protect connections",
+   "misconnected": 17,
+   "vulnerable": 2,
+   "totalDelayMin": 1273,
+   "gateChanges": 11,
+   "holds": 19,
+   "optimal": false,
+   "nodes": 8001
+  },
+  {
+   "id": "C",
+   "name": "Least disruption",
+   "misconnected": 121,
+   "vulnerable": 17,
+   "totalDelayMin": 1228,
+   "gateChanges": 1,
+   "holds": 12,
+   "optimal": false,
+   "nodes": 8001
+  }
+ ],
+ "recommended": "B",
+ "misconnectedBaseline": 101,
+ "sensitivity": {
+  "stormPlusMin": 15,
+  "misconnected": {
+   "W": 104,
+   "A": 144,
+   "B": 8,
+   "C": 116
+  },
+  "totalDelayMin": {
+   "W": 1875,
+   "A": 1595,
+   "B": 1795,
+   "C": 1715
+  }
+ }
+}

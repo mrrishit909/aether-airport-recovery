@@ -1,0 +1,64 @@
+# Local stack: `docker compose up --build` (or `make dev`). Ports: web 8541, API 8540, Postgres 55540, mail sink UI 8542.
+name: aether-airport-recovery
+services:
+  db:
+    image: postgres:16-alpine
+    environment: { POSTGRES_DB: aether, POSTGRES_USER: aether, POSTGRES_PASSWORD: owner-dev-only }
+    ports: ["127.0.0.1:55540:5432"]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U aether -d aether"], interval: 2s, retries: 30 }
+    volumes: [dbdata:/var/lib/postgresql/data]
+
+  generator:   # synthetic data generator: writes data/fixtures (scenario, cost baseline, provenance) into a shared volume
+    build: { context: ., dockerfile: infra/docker/node.Dockerfile }
+    command: ["node", "data/simulators/generate.ts"]
+    volumes: [fixtures:/app/data/fixtures]
+
+  api:         # gateway + ingestion + workflow/orchestrator + domain services + identity, in one process (README "Not built")
+    build: { context: ., dockerfile: infra/docker/node.Dockerfile }
+    command: ["node", "apps/api/src/main.ts"]
+    environment:
+      MIGRATE_ON_START: "1"
+      RATE_LIMIT: ${RATE_LIMIT:-120}
+      OWNER_DATABASE_URL: postgresql://aether:owner-dev-only@db:5432/aether
+      DATABASE_URL: postgresql://aether_app:app-dev-only@db:5432/aether
+      CORS_ORIGINS: http://localhost:8541,http://127.0.0.1:8541
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel:4318
+    ports: ["127.0.0.1:8540:8540"]
+    volumes: [fixtures:/app/data/fixtures]
+    depends_on:
+      db: { condition: service_healthy }
+      generator: { condition: service_completed_successfully }
+      otel: { condition: service_started }
+    healthcheck: { test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8540/healthz"], interval: 3s, retries: 40, start_period: 10s }
+
+  web:         # the same static site as the public sandbox, built to talk to the API instead of bundled fixtures
+    build: { context: ., dockerfile: infra/docker/web.Dockerfile, args: { NEXT_PUBLIC_API_URL: "http://localhost:8540" } }
+    ports: ["127.0.0.1:8541:80"]
+    depends_on: { api: { condition: service_healthy } }
+
+  mail:        # local notification sink (approval notices would land here; UI on 8542)
+    image: axllent/mailpit:v1.21
+    ports: ["127.0.0.1:8542:8025"]
+
+  otel:        # OpenTelemetry collector: receives API traces over OTLP/HTTP and prints them (debug exporter)
+    image: otel/opentelemetry-collector:0.111.0
+    command: ["--config=/etc/otel.yaml"]
+    volumes: [./infra/otel/collector.yaml:/etc/otel.yaml:ro]
+
+  test:        # `docker compose --profile test run --rm test`: unit + agent + API contract tests against a throwaway database
+    profiles: [test]
+    build: { context: ., dockerfile: infra/docker/node.Dockerfile }
+    command: ["sh", "-c", "node data/simulators/generate.ts && npx vitest run --coverage"]
+    environment:
+      OWNER_DATABASE_URL: postgresql://aether:owner-dev-only@testdb:5432/aether
+      DATABASE_URL: postgresql://aether_app:app-dev-only@testdb:5432/aether
+    depends_on: { testdb: { condition: service_healthy } }
+
+  testdb:
+    profiles: [test]
+    image: postgres:16-alpine
+    environment: { POSTGRES_DB: aether, POSTGRES_USER: aether, POSTGRES_PASSWORD: owner-dev-only }
+    tmpfs: [/var/lib/postgresql/data]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U aether -d aether"], interval: 2s, retries: 30 }
+
+volumes: { dbdata: {}, fixtures: {} }

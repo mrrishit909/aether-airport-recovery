@@ -1,0 +1,1 @@
+{ "name": "@aether/domain", "private": true, "type": "module", "exports": { ".": "./src/index.ts" } }

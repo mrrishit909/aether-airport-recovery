@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "deny": ["Bash(rm -rf / *)", "Bash(git push --force *)"]
+  },
+  "hooks": {
+    "PostToolUse": [
+      { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "./scripts/claude/post-edit-check.sh" }] }
+    ],
+    "PreToolUse": [
+      { "matcher": "Bash", "hooks": [{ "type": "command", "command": "./scripts/claude/pre-bash-guard.sh" }] }
+    ],
+    "SubagentStop": [
+      { "matcher": "frontend-motion|backend|database|ai-engineer", "hooks": [{ "type": "command", "command": "./scripts/claude/subagent-stop-tests.sh" }] }
+    ],
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "./scripts/claude/secret-scan.sh" }] }
+    ]
+  }
+}

@@ -1,0 +1,2285 @@
+{
+ "openapi": "3.1.0",
+ "info": {
+  "title": "AETHER API",
+  "version": "1.0.0",
+  "description": "Airport disruption recovery API on a synthetic airport. Mutations need an Idempotency-Key header. Errors are {error:{code,message,traceId}}. Lists are paginated with ?limit and ?cursor (nextCursor). Model calls are simulated (deterministic analyzers charged tokens at a price table); the routing, escalation, gate solver and telemetry are real."
+ },
+ "components": {
+  "securitySchemes": {
+   "bearer": {
+    "type": "http",
+    "scheme": "bearer"
+   }
+  },
+  "schemas": {
+   "AgentResult": {
+    "type": "object",
+    "required": [
+     "agent",
+     "run_id",
+     "status",
+     "confidence",
+     "findings",
+     "evidence_refs",
+     "assumptions",
+     "warnings",
+     "metrics"
+    ],
+    "additionalProperties": false,
+    "properties": {
+     "agent": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9-]+$"
+     },
+     "run_id": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 64
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "success",
+       "partial",
+       "failed"
+      ]
+     },
+     "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+     },
+     "findings": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+       "type": "object",
+       "required": [
+        "id",
+        "type",
+        "summary",
+        "confidence",
+        "evidence",
+        "entities",
+        "data"
+       ],
+       "additionalProperties": false,
+       "properties": {
+        "id": {
+         "type": "string",
+         "minLength": 1
+        },
+        "type": {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 64
+        },
+        "summary": {
+         "type": "string",
+         "maxLength": 1000
+        },
+        "confidence": {
+         "type": "number",
+         "minimum": 0,
+         "maximum": 1
+        },
+        "evidence": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         },
+         "maxItems": 1000
+        },
+        "entities": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         },
+         "maxItems": 1000
+        },
+        "data": {
+         "type": "object"
+        },
+        "technique": {
+         "type": "string",
+         "maxLength": 32
+        }
+       }
+      }
+     },
+     "evidence_refs": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "maxItems": 10000
+     },
+     "assumptions": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "maxLength": 500
+      },
+      "maxItems": 100
+     },
+     "warnings": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "maxLength": 500
+      },
+      "maxItems": 100
+     },
+     "metrics": {
+      "type": "object",
+      "required": [
+       "latency_ms",
+       "input_tokens",
+       "output_tokens",
+       "estimated_cost_usd"
+      ],
+      "additionalProperties": false,
+      "properties": {
+       "latency_ms": {
+        "type": "number",
+        "minimum": 0
+       },
+       "input_tokens": {
+        "type": "integer",
+        "minimum": 0
+       },
+       "output_tokens": {
+        "type": "integer",
+        "minimum": 0
+       },
+       "estimated_cost_usd": {
+        "type": "number",
+        "minimum": 0
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "paths": {
+  "/v1/airport/state": {
+   "get": {
+    "summary": "The tenant's airport as the web app loads it (bounded: one airport, one three-hour window), plus the latest disruption and the approved option's gate assignments",
+    "tags": [
+     "airport"
+    ],
+    "parameters": [
+     {
+      "schema": {
+       "type": "string",
+       "enum": [
+        "outage"
+       ]
+      },
+      "in": "query",
+      "name": "simulate",
+      "required": false
+     }
+    ],
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/disruptions": {
+   "post": {
+    "summary": "Declare a disruption (a thunderstorm, a runway closure or a ground stop)",
+    "tags": [
+     "disruptions"
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "name",
+         "triggerType",
+         "triggerPayload"
+        ],
+        "properties": {
+         "name": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 200
+         },
+         "triggerType": {
+          "type": "string",
+          "enum": [
+           "thunderstorm",
+           "runway_closure",
+           "ground_stop"
+          ]
+         },
+         "triggerPayload": {
+          "type": "object",
+          "required": [
+           "start",
+           "durationMin"
+          ],
+          "properties": {
+           "start": {
+            "type": "string",
+            "format": "date-time"
+           },
+           "durationMin": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 240
+           },
+           "capacityFactor": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "schema": {
+       "type": "string",
+       "minLength": 8,
+       "maxLength": 128
+      },
+      "in": "header",
+      "name": "idempotency-key",
+      "required": true
+     }
+    ],
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "responses": {
+     "201": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "id",
+          "name",
+          "triggerType",
+          "status"
+         ],
+         "properties": {
+          "id": {
+           "type": "string",
+           "format": "uuid"
+          },
+          "name": {
+           "type": "string"
+          },
+          "triggerType": {
+           "type": "string",
+           "enum": [
+            "thunderstorm",
+            "runway_closure",
+            "ground_stop"
+           ]
+          },
+          "triggerPayload": {
+           "type": "object",
+           "additionalProperties": true
+          },
+          "status": {
+           "type": "string",
+           "enum": [
+            "declared",
+            "analyzed",
+            "optimized",
+            "approved"
+           ]
+          },
+          "createdAt": {
+           "type": [
+            "null",
+            "string"
+           ]
+          },
+          "lastRunId": {
+           "type": [
+            "null",
+            "string"
+           ]
+          },
+          "recommendation": {
+           "type": [
+            "null",
+            "object"
+           ],
+           "additionalProperties": true
+          },
+          "analysis": {
+           "type": [
+            "null",
+            "object"
+           ],
+           "additionalProperties": true
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "disruptions"
+    ],
+    "parameters": [
+     {
+      "schema": {
+       "type": "string"
+      },
+      "in": "query",
+      "name": "status",
+      "required": false
+     },
+     {
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 200,
+       "default": 50
+      },
+      "in": "query",
+      "name": "limit",
+      "required": false
+     },
+     {
+      "schema": {
+       "type": "string"
+      },
+      "in": "query",
+      "name": "cursor",
+      "required": false
+     }
+    ],
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "items"
+         ],
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "id",
+             "name",
+             "triggerType",
+             "status"
+            ],
+            "properties": {
+             "id": {
+              "type": "string",
+              "format": "uuid"
+             },
+             "name": {
+              "type": "string"
+             },
+             "triggerType": {
+              "type": "string",
+              "enum": [
+               "thunderstorm",
+               "runway_closure",
+               "ground_stop"
+              ]
+             },
+             "triggerPayload": {
+              "type": "object",
+              "additionalProperties": true
+             },
+             "status": {
+              "type": "string",
+              "enum": [
+               "declared",
+               "analyzed",
+               "optimized",
+               "approved"
+              ]
+             },
+             "createdAt": {
+              "type": [
+               "null",
+               "string"
+              ]
+             },
+             "lastRunId": {
+              "type": [
+               "null",
+               "string"
+              ]
+             },
+             "recommendation": {
+              "type": [
+               "null",
+               "object"
+              ],
+              "additionalProperties": true
+             },
+             "analysis": {
+              "type": [
+               "null",
+               "object"
+              ],
+              "additionalProperties": true
+             }
+            }
+           }
+          },
+          "nextCursor": {
+           "type": [
+            "null",
+            "string"
+           ]
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/disruptions/{id}": {
+   "get": {
+    "tags": [
+     "disruptions"
+    ],
+    "parameters": [
+     {
+      "schema": {
+       "type": "string"
+      },
+      "in": "path",
+      "name": "id",
+      "required": true
+     }
+    ],
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "id",
+          "name",
+          "triggerType",
+          "status"
+         ],
+         "properties": {
+          "id": {
+           "type": "string",
+           "format": "uuid"
+          },
+          "name": {
+           "type": "string"
+          },
+          "triggerType": {
+           "type": "string",
+           "enum": [
+            "thunderstorm",
+            "runway_closure",
+            "ground_stop"
+           ]
+          },
+          "triggerPayload": {
+           "type": "object",
+           "additionalProperties": true
+          },
+          "status": {
+           "type": "string",
+           "enum": [
+            "declared",
+            "analyzed",
+            "optimized",
+            "approved"
+           ]
+          },
+          "createdAt": {
+           "type": [
+            "null",
+            "string"
+           ]
+          },
+          "lastRunId": {
+           "type": [
+            "null",
+            "string"
+           ]
+          },
+          "recommendation": {
+           "type": [
+            "null",
+            "object"
+           ],
+           "additionalProperties": true
+          },
+          "analysis": {
+           "type": [
+            "null",
+            "object"
+           ],
+           "additionalProperties": true
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/disruptions/{id}/analyze": {
+   "post": {
+    "summary": "Run the analysis phase: weather agent, the deterministic constraint builder, then four analysts in parallel (flight risk, gates, passengers, ground ops)",
+    "tags": [
+     "workflow"
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "faults": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+           "type": "object",
+           "required": [
+            "code",
+            "remaining"
+           ],
+           "properties": {
+            "code": {
+             "type": "string",
+             "enum": [
+              "rate_limited",
+              "provider_error",
+              "timeout"
+             ]
+            },
+            "model": {
+             "type": "string",
+             "enum": [
+              "haiku",
+              "sonnet",
+              "opus"
+             ]
+            },
+            "agent": {
+             "type": "string"
+            },
+            "remaining": {
+             "type": "integer",
+             "minimum": 1,
+             "maximum": 100
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "schema": {
+       "type": "string"
+      },
+      "in": "path",
+      "name": "id",
+      "required": true
+     },
+     {
+      "schema": {
+       "type": "string",
+       "minLength": 8,
+       "maxLength": 128
+      },
+      "in": "header",
+      "name": "idempotency-key",
+      "required": true
+     }
+    ],
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "responses": {
+     "201": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "properties": {
+          "runId": {
+           "type": "string"
+          },
+          "status": {
+           "type": "string"
+          },
+          "findings": {
+           "type": "integer"
+          },
+          "costUsd": {
+           "type": "number"
+          },
+          "escalations": {
+           "type": "object",
+           "additionalProperties": true
+          },
+          "capacity": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "additionalProperties": true
+           }
+          },
+          "baseline": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "additionalProperties": true
+           }
+          },
+          "summary": {
+           "type": "object",
+           "additionalProperties": true
+          },
+          "invocations": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "additionalProperties": true
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/disruptions/{id}/optimize": {
+   "post": {
+    "summary": "Run the optimization phase: the optimizer agent calls the gate solver for three strategies (plus the wait-for-gates reference), then the recovery synthesizer compares them on compact structured results only",
+    "tags": [
+     "workflow"
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "faults": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+           "type": "object",
+           "required": [
+            "code",
+            "remaining"
+           ],
+           "properties": {
+            "code": {
+             "type": "string",
+             "enum": [
+              "rate_limited",
+              "provider_error",
+              "timeout"
+             ]
+            },
+            "model": {
+             "type": "string",
+             "enum": [
+              "haiku",
+              "sonnet",
+              "opus"
+             ]
+            },
+            "agent": {
+             "type": "string"
+            },
+            "remaining": {
+             "type": "integer",
+             "minimum": 1,
+             "maximum": 100
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "schema": {
+       "type": "string"
+      },
+      "in": "path",
+      "name": "id",
+      "required": true
+     },
+     {
+      "schema": {
+       "type": "string",
+       "minLength": 8,
+       "maxLength": 128
+      },
+      "in": "header",
+      "name": "idempotency-key",
+      "required": true
+     }
+    ],
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "responses": {
+     "201": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "properties": {
+          "runId": {
+           "type": "string"
+          },
+          "options": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "id",
+             "optionKey",
+             "name",
+             "status"
+            ],
+            "properties": {
+             "id": {
+              "type": "string",
+              "format": "uuid"
+             },
+             "scenarioId": {
+              "type": "string"
+             },
+             "optionKey": {
+              "type": "string"
+             },
+             "name": {
+              "type": "string"
+             },
+             "objectiveScore": {
+              "type": "number"
+             },
+             "passengerImpact": {
+              "type": "object",
+              "additionalProperties": true
+             },
+             "operationalChanges": {
+              "type": "object",
+              "additionalProperties": true
+             },
+             "solverMetadata": {
+              "type": "object",
+              "additionalProperties": true
+             },
+             "strategy": {
+              "type": "object",
+              "additionalProperties": true
+             },
+             "status": {
+              "type": "string"
+             },
+             "times": {
+              "type": "array",
+              "items": {
+               "type": "object",
+               "additionalProperties": true
+              }
+             },
+             "approval": {
+              "type": [
+               "null",
+               "object"
+              ],
+              "additionalProperties": true
+             }
+            }
+           }
+          },
+          "recommendation": {
+           "type": "object",
+           "additionalProperties": true
+          },
+          "costUsd": {
+           "type": "number"
+          },
+          "escalations": {
+           "type": "object",
+           "additionalProperties": true
+          },
+          "synthesisInputTokens": {
+           "type": "integer"
+          },
+          "sensitivity": {
+           "type": "object",
+           "additionalProperties": true
+          },
+          "invocations": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "additionalProperties": true
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/disruptions/{id}/options": {
+   "get": {
+    "summary": "The proposed recovery options (and the synthesizer's recommendation), paginated",
+    "tags": [
+     "disruptions"
+    ],
+    "parameters": [
+     {
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 50,
+       "default": 10
+      },
+      "in": "query",
+      "name": "limit",
+      "required": false
+     },
+     {
+      "schema": {
+       "type": "string"
+      },
+      "in": "query",
+      "name": "cursor",
+      "required": false
+     },
+     {
+      "schema": {
+       "type": "boolean",
+       "default": false
+      },
+      "in": "query",
+      "name": "includeSuperseded",
+      "required": false
+     },
+     {
+      "schema": {
+       "type": "string"
+      },
+      "in": "path",
+      "name": "id",
+      "required": true
+     }
+    ],
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "items"
+         ],
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "id",
+             "optionKey",
+             "name",
+             "status"
+            ],
+            "properties": {
+             "id": {
+              "type": "string",
+              "format": "uuid"
+             },
+             "scenarioId": {
+              "type": "string"
+             },
+             "optionKey": {
+              "type": "string"
+             },
+             "name": {
+              "type": "string"
+             },
+             "objectiveScore": {
+              "type": "number"
+             },
+             "passengerImpact": {
+              "type": "object",
+              "additionalProperties": true
+             },
+             "operationalChanges": {
+              "type": "object",
+              "additionalProperties": true
+             },
+             "solverMetadata": {
+              "type": "object",
+              "additionalProperties": true
+             },
+             "strategy": {
+              "type": "object",
+              "additionalProperties": true
+             },
+             "status": {
+              "type": "string"
+             },
+             "times": {
+              "type": "array",
+              "items": {
+               "type": "object",
+               "additionalProperties": true
+              }
+             },
+             "approval": {
+              "type": [
+               "null",
+               "object"
+              ],
+              "additionalProperties": true
+             }
+            }
+           }
+          },
+          "nextCursor": {
+           "type": [
+            "null",
+            "string"
+           ]
+          },
+          "recommendation": {
+           "type": [
+            "null",
+            "object"
+           ],
+           "additionalProperties": true
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/options/{id}/approve": {
+   "post": {
+    "summary": "Human approval gate: records who approved which option, supersedes the others, writes the gate assignments, audits it and returns the dispatch order (markdown)",
+    "tags": [
+     "workflow"
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "note": {
+          "type": "string",
+          "maxLength": 500
+         },
+         "acknowledgePolicy": {
+          "type": "boolean"
+         }
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "schema": {
+       "type": "string"
+      },
+      "in": "path",
+      "name": "id",
+      "required": true
+     },
+     {
+      "schema": {
+       "type": "string",
+       "minLength": 8,
+       "maxLength": 128
+      },
+      "in": "header",
+      "name": "idempotency-key",
+      "required": true
+     }
+    ],
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "responses": {
+     "201": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "status": {
+           "type": "string"
+          },
+          "optionKey": {
+           "type": "string"
+          },
+          "approvedBy": {
+           "type": "string"
+          },
+          "at": {
+           "type": "string"
+          },
+          "planMarkdown": {
+           "type": "string"
+          },
+          "planHash": {
+           "type": "string"
+          },
+          "gateAssignments": {
+           "type": "integer"
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/disruptions/{id}/agent-map": {
+   "get": {
+    "summary": "Every agent invocation of the disruption's analysis and optimization runs, with model, escalation, retries and cost",
+    "tags": [
+     "workflow"
+    ],
+    "parameters": [
+     {
+      "schema": {
+       "type": "string"
+      },
+      "in": "path",
+      "name": "id",
+      "required": true
+     }
+    ],
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "runIds": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "invocations": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "additionalProperties": true
+           }
+          },
+          "summary": {
+           "type": "object",
+           "additionalProperties": true
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/costs": {
+   "get": {
+    "summary": "Appendix C dashboards across the tenant's runs: cost per run, tokens by agent/model, escalation rate, retry waste, cache",
+    "tags": [
+     "workflow"
+    ],
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/audit": {
+   "get": {
+    "tags": [
+     "admin"
+    ],
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "additionalProperties": true
+           }
+          },
+          "chainValid": {
+           "type": "boolean"
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Default Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "error": {
+           "type": "object",
+           "properties": {
+            "code": {
+             "type": "string"
+            },
+            "message": {
+             "type": "string"
+            },
+            "traceId": {
+             "type": "string"
+            },
+            "details": {}
+           },
+           "required": [
+            "code",
+            "message"
+           ]
+          }
+         },
+         "required": [
+          "error"
+         ]
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "servers": [
+  {
+   "url": "http://localhost:8540"
+  }
+ ]
+}
