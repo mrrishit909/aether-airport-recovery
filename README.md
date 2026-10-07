@@ -167,8 +167,8 @@ flowchart LR
 
 ## Performance and observability
 
-- **Browser, real GPU** (Chrome on Apple silicon, headless with Metal, during the recording): 60 FPS, p95 frame 18.4 ms, 19
-  draw calls, LCP 112 ms, INP 88 ms, CLS 0.002. The workflow runs in a Web Worker with simulated latency scaled to 0.6 so each
+- **Browser, real GPU** (Chrome on Apple silicon, headless with Metal, during the recording): 60 FPS, p95 frame 18.3 ms, 19
+  draw calls, LCP 76 ms, INP 80 ms, CLS 0.002. The workflow runs in a Web Worker with simulated latency scaled to 0.6 so each
   agent is visible for a moment: about 4 to 5 s for the whole recovery.
 - **Browser, 5,000-aircraft stress, software GL** (SwiftShader in the e2e test, `docs/performance-e2e.json`): **8 FPS** in the
   last run (4 in an earlier one), p95 frame 297 ms, 242,802 triangles in 20 draw calls (the 5,000 extra aircraft are one
